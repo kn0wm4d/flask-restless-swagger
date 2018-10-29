@@ -104,7 +104,7 @@ class SwagAPIManager(object):
         self.swagger['tags'].append({'name': schema})
         columns = get_columns(model)
         pkey = primary_key_name(model)
-        pkey_type = columns.get(pkey)
+        pkey_type = str(columns.get(pkey).type)
         pkey_def = sqlalchemy_swagger_mapping[pkey_type]
         pkey_def['name'] = schema.lower() + pkey
         pkey_def['in'] = 'path'
