@@ -13,6 +13,8 @@ parts
 bin
 var
 sdist
+venv/
+.vscode
 develop-eggs
 .installed.cfg
 lib

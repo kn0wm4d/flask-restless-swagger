@@ -4,16 +4,16 @@ __version__ = '0.0.3.3'
 
 try:
     import urlparse
-except:
+except Exception:
     from urllib import parse as urlparse
 
 import os
 import json
 import re
 import yaml
-from flask import jsonify, request, Blueprint, redirect, render_template
+from flask import jsonify, request, Blueprint, render_template
 from flask_restless import APIManager
-from flask_restless.helpers import *
+from flask_restless.helpers import get_columns, primary_key_name, get_related_model
 
 sqlalchemy_swagger_mapping = {
     'INTEGER': {'format': 'int32', 'type': 'integer'},
@@ -93,15 +93,23 @@ class SwagAPIManager(object):
 
     def set_basepath(self, value):
         self.swagger['basePath'] = value
-        
+
     def add_path(self, model, **kwargs):
         name = model.__tablename__
         schema = model.__name__
         path = kwargs.get('url_prefix', "") + '/' + name
-        path = re.sub(r'^{}'.format(self.swagger['basePath']),'',path)
+        path = re.sub(r'^{}'.format(self.swagger['basePath']), '', path)
         id_path = "{0}/{{{1}Id}}".format(path, schema.lower())
         self.swagger['paths'][path] = {}
         self.swagger['tags'].append({'name': schema})
+        columns = get_columns(model)
+        pkey = primary_key_name(model)
+        pkey_type = columns.get(pkey)
+        pkey_def = sqlalchemy_swagger_mapping[pkey_type]
+        pkey_def['name'] = schema.lower() + pkey
+        pkey_def['in'] = 'path'
+        pkey_def['description'] = 'ID of ' + schema
+        pkey_def['required'] = True
         for method in [m.lower() for m in kwargs.get('methods', ['GET'])]:
 
             # GET
@@ -133,14 +141,7 @@ class SwagAPIManager(object):
                     self.swagger['paths'][id_path] = {}
                 self.swagger['paths'][id_path][method] = {
                     'tags': [schema],
-                    'parameters': [{
-                        'name': schema.lower() + 'Id',
-                        'in': 'path',
-                        'description': 'ID of ' + schema,
-                        'required': True,
-                        'type': 'integer',
-                        'format': 'int64'
-                    }],
+                    'parameters': [pkey_def],
                     'responses': {
                         200: {
                             'description': 'Success ' + name,
@@ -160,14 +161,7 @@ class SwagAPIManager(object):
                     self.swagger['paths'][id_path] = {}
                 self.swagger['paths'][id_path][method] = {
                     'tags': [schema],
-                    'parameters': [{
-                        'name': schema.lower() + 'Id',
-                        'in': 'path',
-                        'description': 'ID of ' + schema,
-                        'required': True,
-                        'type': 'integer',
-                        'format': 'int64'
-                    }],
+                    'parameters': [pkey_def],
                     'responses': {
                         200: {
                             'description': 'Success'
@@ -184,21 +178,16 @@ class SwagAPIManager(object):
                     self.swagger['paths'][id_path] = {}
                 self.swagger['paths'][id_path][method] = {
                     'tags': [schema],
-                    'parameters': [{
-                        'name': schema.lower() + 'Id',
-                        'in': 'path',
-                        'description': 'ID of ' + schema,
-                        'required': True,
-                        'type': 'integer',
-                        'format': 'int64'
-                    },
-                    {
-                        'name': name,
-                        'in': 'body',
-                        'description': schema,
-                        'required': True,
-                        'schema': {"$ref": "#/definitions/" + schema}
-                    }],
+                    'parameters': [
+                        pkey_def,
+                        {
+                            'name': name,
+                            'in': 'body',
+                            'description': schema,
+                            'required': True,
+                            'schema': {"$ref": "#/definitions/" + schema}
+                        }
+                    ],
                     'responses': {
                         200: {
                             'description': 'Success'
@@ -223,7 +212,6 @@ class SwagAPIManager(object):
                         200: {
                             'description': 'Success'
                         }
-
                     }
                 }
                 if model.__doc__:
@@ -248,7 +236,7 @@ class SwagAPIManager(object):
             except AttributeError:
                 schema = get_related_model(model, column_name)
                 missing_defs.append(schema)
-                
+
                 if column_name + '_id' in columns:
                     column_defn = {'schema': {
                         '$ref': "#/definitions/"+schema.__name__
@@ -264,7 +252,7 @@ class SwagAPIManager(object):
             for miss in missing_defs:
                 if miss.__name__ not in self.swagger['definitions']:
                     self.add_defn(miss)
-            
+
     def init_app(self, app, **kwargs):
         self.app = app
         self.manager = APIManager(self.app, **kwargs)
@@ -272,10 +260,11 @@ class SwagAPIManager(object):
         swagger = Blueprint('swagger', __name__, static_folder='static/swagger-ui',
                             static_url_path=self.app.static_url_path + '/swagger',
                             )
-        swaggerui_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/swagger-ui')
+        swaggerui_folder = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'static/swagger-ui')
         print(swaggerui_folder)
         self.app.jinja_loader.searchpath.append(swaggerui_folder)
-        
+
         @swagger.route('/swagger')
         def swagger_ui():
             return render_template('index.html')
@@ -295,5 +284,4 @@ class SwagAPIManager(object):
         self.add_path(model, **kwargs)
 
     def swagger_blueprint(self):
-
-        return swagger
+        return self.swagger
