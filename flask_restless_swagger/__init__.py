@@ -104,7 +104,7 @@ class SwagAPIManager(object):
         columns = get_columns(model)
         pkey = kwargs.get('primary_key', primary_key_name(model))
         id_name = "{0}_{1}".format(schema.lower(), pkey)
-        id_path = "{0}/{{1}}".format(path, id_name)
+        id_path = "{0}/{{{1}}}".format(path, id_name)
         pkey_type = str(columns.get(pkey).type)
         if '(' in pkey_type:
             pkey_type = pkey_type.split('(')[0]
