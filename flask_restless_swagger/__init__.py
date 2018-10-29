@@ -107,7 +107,7 @@ class SwagAPIManager(object):
         pkey_type = str(columns.get(pkey).type)
         if '(' in pkey_type:
             pkey_type = pkey_type.split('(')[0]
-        pkey_def = sqlalchemy_swagger_mapping[pkey_type]
+        pkey_def = sqlalchemy_swagger_mapping[pkey_type].copy()
         pkey_def['name'] = schema.lower() + pkey
         pkey_def['in'] = 'path'
         pkey_def['description'] = 'Primary key of ' + schema
