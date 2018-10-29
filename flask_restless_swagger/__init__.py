@@ -105,10 +105,12 @@ class SwagAPIManager(object):
         columns = get_columns(model)
         pkey = kwargs.get('primary_key', primary_key_name(model))
         pkey_type = str(columns.get(pkey).type)
+        if '(' in pkey_type:
+            pkey_type = pkey_type.split('(')[0]
         pkey_def = sqlalchemy_swagger_mapping[pkey_type]
         pkey_def['name'] = schema.lower() + pkey
         pkey_def['in'] = 'path'
-        pkey_def['description'] = 'ID of ' + schema
+        pkey_def['description'] = 'Primary key of ' + schema
         pkey_def['required'] = True
         for method in [m.lower() for m in kwargs.get('methods', ['GET'])]:
 
