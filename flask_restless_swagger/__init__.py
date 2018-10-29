@@ -99,16 +99,17 @@ class SwagAPIManager(object):
         schema = model.__name__
         path = kwargs.get('url_prefix', "") + '/' + name
         path = re.sub(r'^{}'.format(self.swagger['basePath']), '', path)
-        id_path = "{0}/{{{1}Id}}".format(path, schema.lower())
         self.swagger['paths'][path] = {}
         self.swagger['tags'].append({'name': schema})
         columns = get_columns(model)
         pkey = kwargs.get('primary_key', primary_key_name(model))
+        id_name = "{0}_{1}".format(schema.lower(), pkey)
+        id_path = "{0}/{{1}}".format(path, id_name)
         pkey_type = str(columns.get(pkey).type)
         if '(' in pkey_type:
             pkey_type = pkey_type.split('(')[0]
         pkey_def = sqlalchemy_swagger_mapping[pkey_type].copy()
-        pkey_def['name'] = schema.lower() + pkey
+        pkey_def['name'] = id_name
         pkey_def['in'] = 'path'
         pkey_def['description'] = 'Primary key of ' + schema
         pkey_def['required'] = True
