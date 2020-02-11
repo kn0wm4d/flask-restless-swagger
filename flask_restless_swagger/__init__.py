@@ -84,8 +84,8 @@ class SwagAPIManager(object):
         'info': {},
         'schemes': ['http', 'https'],
         'basePath': '/api',
-        'consumes': ['application/json'],
-        'produces': ['application/json'],
+        'consumes': ['application/vnd.api+json'],
+        'produces': ['application/vnd.api+json'],
         'paths': {},
         'definitions': {},
         'tags': []
@@ -163,10 +163,11 @@ class SwagAPIManager(object):
                 self.swagger['paths'][path][method] = {
                     'tags': [schema],
                     'parameters': [{
-                        'name': 'q',
+                        'name': 'filter[objects]',
                         'in': 'query',
-                        'description': 'searchjson',
-                        'type': 'string'
+                        'description': 'Filter by field',
+                        'type': 'string',
+                        'default': '[{"name": "id", "op": "==", "val": 1}]'
                     }],
                     'responses': {
                         200: {
@@ -261,6 +262,44 @@ class SwagAPIManager(object):
                 }
                 if model.__doc__:
                     self.swagger['paths'][path][method]['description'] = model.__doc__
+            
+            if method in ['get', 'patch', 'delete']:
+                self.swagger['paths'][id_path][method]['parameters'].append({
+                        'name': "Content-Type",
+                        'in': "header",
+                        'type': "string",
+                        'default': "application/vnd.api+json",
+                        'enum': [
+                        "application/vnd.api+json",
+                        "application/json",
+                        ],
+                        'required': True,
+                        })
+                self.swagger['paths'][id_path][method]['parameters'].append({
+                                    'name': 'X-Api-Key',
+                                    'in': 'header',
+                                    'type': 'string',
+                                    'required': True,
+                                    })
+
+            if method in ['get', 'post']:
+                self.swagger['paths'][path][method]['parameters'].append({
+                        'name': "Content-Type",
+                        'in': "header",
+                        'type': "string",
+                        'default': "application/vnd.api+json",
+                        'enum': [
+                        "application/vnd.api+json",
+                        "application/json",
+                        ],
+                        'required': True,
+                        })
+                self.swagger['paths'][path][method]['parameters'].append({
+                                    'name': 'X-Api-Key',
+                                    'in': 'header',
+                                    'type': 'string',
+                                    'required': True,
+                                    })
 
     def add_defn(self, model, **kwargs):
         missing_defs = []
