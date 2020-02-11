@@ -11,9 +11,16 @@ import os
 import json
 import re
 import yaml
+import inspect
 from flask import jsonify, request, Blueprint, render_template
 from flask_restless import APIManager
-from flask_restless.helpers import get_columns, primary_key_name, get_related_model
+from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlalchemy.orm.attributes import QueryableAttribute
+from sqlalchemy.orm import ColumnProperty
+from sqlalchemy.ext.hybrid import hybrid_property
+from flask_restless.helpers import get_related_model
+
+COLUMN_TYPES = (InstrumentedAttribute, hybrid_property)
 
 sqlalchemy_swagger_mapping = {
     'INTEGER': {'format': 'int32', 'type': 'integer'},
@@ -36,6 +43,39 @@ sqlalchemy_swagger_mapping = {
     'INTERVAL': {'format': 'date-time', 'type': 'string'},
     'geometry': {'format': 'string', 'type': 'string'},
 }
+
+def get_columns(model):
+    """Returns a dictionary-like object containing all the columns of the
+    specified `model` class.
+    This includes `hybrid attributes`_.
+    .. _hybrid attributes: http://docs.sqlalchemy.org/en/latest/orm/extensions/hybrid.html
+    """
+    columns = {}
+    for superclass in model.__mro__:
+        for name, column in superclass.__dict__.items():
+            if isinstance(column, COLUMN_TYPES):
+                columns[name] = column
+    return columns
+
+def primary_key_names(model):
+    """Returns all the primary keys for a model."""
+    return [key for key, field in inspect.getmembers(model)
+           if isinstance(field, QueryableAttribute)
+           and isinstance(field.property, ColumnProperty)
+           and field.property.columns[0].primary_key]
+
+def primary_key_name(model_or_instance):
+    """Returns the name of the primary key of the specified model or instance
+    of a model, as a string.
+    If `model_or_instance` specifies multiple primary keys and ``'id'`` is one
+    of them, ``'id'`` is returned. If `model_or_instance` specifies multiple
+    primary keys and ``'id'`` is not one of them, only the name of the first
+    one in the list of primary keys is returned.
+    """
+    its_a_model = isinstance(model_or_instance, type)
+    model = model_or_instance if its_a_model else model_or_instance.__class__
+    pk_names = primary_key_names(model)
+    return 'id' if 'id' in pk_names else pk_names[0]
 
 
 class SwagAPIManager(object):
