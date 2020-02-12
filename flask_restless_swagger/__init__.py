@@ -144,8 +144,6 @@ class SwagAPIManager(object):
         columns = get_columns(model)
         pkey = kwargs.get('primary_key', primary_key_name(model))
         id_name = pkey
-        if pkey == 'id':
-            id_name = "{0}Id".format(schema)
         id_path = "{0}/{{{1}}}".format(path, id_name)
         pkey_type = str(columns.get(pkey).type)
         if '(' in pkey_type:
@@ -265,17 +263,6 @@ class SwagAPIManager(object):
             
             if method in ['get', 'patch', 'delete']:
                 self.swagger['paths'][id_path][method]['parameters'].append({
-                        'name': "Content-Type",
-                        'in': "header",
-                        'type': "string",
-                        'default': "application/vnd.api+json",
-                        'enum': [
-                        "application/vnd.api+json",
-                        "application/json",
-                        ],
-                        'required': True,
-                        })
-                self.swagger['paths'][id_path][method]['parameters'].append({
                                     'name': 'X-Api-Key',
                                     'in': 'header',
                                     'type': 'string',
@@ -283,17 +270,6 @@ class SwagAPIManager(object):
                                     })
 
             if method in ['get', 'post']:
-                self.swagger['paths'][path][method]['parameters'].append({
-                        'name': "Content-Type",
-                        'in': "header",
-                        'type': "string",
-                        'default': "application/vnd.api+json",
-                        'enum': [
-                        "application/vnd.api+json",
-                        "application/json",
-                        ],
-                        'required': True,
-                        })
                 self.swagger['paths'][path][method]['parameters'].append({
                                     'name': 'X-Api-Key',
                                     'in': 'header',
