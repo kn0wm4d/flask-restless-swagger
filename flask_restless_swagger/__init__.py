@@ -353,11 +353,6 @@ class SwagAPIManager(object):
         print(swaggerui_folder)
         self.app.jinja_loader.searchpath.append(swaggerui_folder)
 
-        @swagger.route('/swagger')
-        def swagger_ui():
-            return render_template('index.html')
-            # return redirect('/static/swagger/swagger-ui/index.html')
-
         @swagger.route('/swagger.json')
         def swagger_json():
             # I can only get this from a request context
