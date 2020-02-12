@@ -144,6 +144,8 @@ class SwagAPIManager(object):
         columns = get_columns(model)
         pkey = kwargs.get('primary_key', primary_key_name(model))
         id_name = pkey
+        if pkey == 'id':
+            id_name = "{0}Id".format(schema)
         id_path = "{0}/{{{1}}}".format(path, id_name)
         pkey_type = str(columns.get(pkey).type)
         if '(' in pkey_type:
@@ -165,7 +167,7 @@ class SwagAPIManager(object):
                         'in': 'query',
                         'description': 'Filter by field',
                         'type': 'string',
-                        'default': '[{"name": "id", "op": "==", "val": 1}]'
+                        'default': '[{"name": "%s", "op": "==", "val": 1}]' % pkey
                     }],
                     'responses': {
                         200: {
@@ -220,6 +222,20 @@ class SwagAPIManager(object):
             elif method == 'patch' or method == 'put':
                 if id_path not in self.swagger['paths']:
                     self.swagger['paths'][id_path] = {}
+                self.swagger['definitions']['%spatchBody' % schema] = {
+                    'type': 'object',
+                    'properties': {
+                        'data': {'type' : 'object', "$ref": "#/definitions/%spatchBodyParams" % schema},
+                    }
+                }
+                self.swagger['definitions']['%spatchBodyParams' % schema] = {
+                    'type': 'object',
+                    'properties': {
+                        'type': {'type' : 'string', 'example': name},
+                        'attributes': {"$ref": "#/definitions/" + schema},
+                        pkey: {'type': 'string', 'example': '1'}
+                    }
+                }
                 self.swagger['paths'][id_path][method] = {
                     'tags': [schema],
                     'parameters': [
@@ -229,7 +245,7 @@ class SwagAPIManager(object):
                             'in': 'body',
                             'description': schema,
                             'required': True,
-                            'schema': {"$ref": "#/definitions/" + schema}
+                            'schema': {"$ref": "#/definitions/%spatchBody" % schema}
                         }
                     ],
                     'responses': {
@@ -243,14 +259,27 @@ class SwagAPIManager(object):
 
             # POST and others
             else:
+                self.swagger['definitions']['%spostBody' % schema] = {
+                    'type': 'object',
+                    'properties': {
+                        'data': {'type' : 'object', "$ref": "#/definitions/%spostBodyParams" % schema},
+                    }
+                }
+                self.swagger['definitions']['%spostBodyParams' % schema] = {
+                    'type': 'object',
+                    'properties': {
+                        'type': {'type' : 'string', 'example': name},
+                        'attributes': {"$ref": "#/definitions/" + schema},
+                    }
+                }
                 self.swagger['paths'][path][method] = {
                     'tags': [schema],
                     'parameters': [{
-                        'name': name,
+                        'name': 'data',
                         'in': 'body',
                         'description': schema,
                         'required': True,
-                        'schema': {"$ref": "#/definitions/" + schema}
+                        'schema': {"$ref": "#/definitions/%spostBody" % schema}
                     }],
                     'responses': {
                         200: {
@@ -296,7 +325,6 @@ class SwagAPIManager(object):
             except AttributeError:
                 schema = get_related_model(model, column_name)
                 missing_defs.append(schema)
-
                 if column_name + '_id' in columns:
                     column_defn = {'schema': {
                         '$ref': "#/definitions/"+schema.__name__
