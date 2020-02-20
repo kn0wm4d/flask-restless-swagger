@@ -80,7 +80,7 @@ def generate_post_test(tablename, model):
         elif column_type == 'INTEGER' and v:
             random_obj[k] = int(v)
         elif column_type == 'DATETIME':
-            random_obj[k] = v.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            random_obj[k] = v.strftime('%Y-%m-%d %H:%M:%S')
         elif column_type == 'TEXT':
             random_obj[k] = str(v)
         elif column_type == 'BOOLEAN':
@@ -444,8 +444,6 @@ class SwagAPIManager(object):
             try:
                 generate_post_test(tablename, model)
             except:
-                import traceback
-                print(traceback.format_exc())
                 pass
 
 
