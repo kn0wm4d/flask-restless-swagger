@@ -44,6 +44,71 @@ sqlalchemy_swagger_mapping = {
     'geometry': {'format': 'string', 'type': 'string'},
 }
 
+def generate_gets_test(tablename, model):
+    from sqlalchemy.sql.expression import func
+    test_get_template = open('test_generator/get_template','r').read()
+    primary_key = list(model.__table__.primary_key)[0].name
+    random_id = model.query.order_by(func.random()).first().__dict__[primary_key]
+    if isinstance(random_id, int):
+        example_filter = '[{"name": "%s", "op": "==", "val": %s}]' % (primary_key, random_id)
+    if isinstance(random_id, str):
+        example_filter = '[{"name": "%s", "op": "==", "val": "%s"}]' % (primary_key, random_id)
+    template = test_get_template.format(os.getenv('SECPORTAL_APIKEY'), tablename, random_id, example_filter)
+    file_test_routes = open('tests/test_routes.py','a')
+    file_test_routes.write(template)
+    file_test_routes.close()
+    print('Generated test_get_%s()' % tablename)
+
+def generate_post_test(tablename, model):
+    from sqlalchemy.sql.expression import func
+    import enum
+    from datetime import datetime
+    test_post_template = open('test_generator/post_template','r').read()
+    primary_key = list(model.__table__.primary_key)[0].name
+    random_obj = model.query.order_by(func.random()).first().__dict__
+    del random_obj[primary_key]
+    del random_obj['_sa_instance_state']
+    columns_obj = get_columns(model)
+    for k,v in random_obj.items():
+        column_type = str(columns_obj[k].type)
+        if columns_obj[k].nullable is True and not v:
+            random_obj[k] = None
+        elif column_type == 'DATE':
+            random_obj[k] = v.strftime('%Y-%m-%d')
+        elif column_type == 'INTEGER' and not v:
+            random_obj[k] = None
+        elif column_type == 'INTEGER' and v:
+            random_obj[k] = int(v)
+        elif column_type == 'DATETIME':
+            random_obj[k] = v.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+        elif column_type == 'TEXT':
+            random_obj[k] = str(v)
+        elif column_type == 'BOOLEAN':
+            random_obj[k] = bool(v)
+        elif 'VARCHAR' in column_type:
+            random_obj[k] = v.value
+    example_object = {}
+    example_object['data'] = {'type': tablename, 'attributes': random_obj}
+    template = test_post_template.format(os.getenv('SECPORTAL_APIKEY'), tablename, example_object)
+    file_test_routes = open('tests/test_routes.py','a')
+    file_test_routes.write(template)
+    file_test_routes.close()
+    print('Generated test_post_%s()' % tablename)
+
+def generate_headers_tests():
+    try:
+        os.mkdir('tests')
+        print('Creating tests package...')
+    except FileExistsError:
+        print('Updating tests...')
+    file_test_routes = open('tests/__init__.py','w').write('')
+    file_test_routes = open('tests/test_routes.py','w').write('')
+    test_header = open('test_generator/header_tests_template','r')
+    file_test_routes = open('tests/test_routes.py','a')
+    file_test_routes.write(test_header.read())
+    test_header.close()
+    file_test_routes.close()
+
 def get_columns(model):
     """Returns a dictionary-like object containing all the columns of the
     specified `model` class.
@@ -97,6 +162,7 @@ class SwagAPIManager(object):
 
         if app is not None:
             self.init_app(app, **kwargs)
+        self.create_tests()
 
     def to_json(self, **kwargs):
         return json.dumps(self.swagger, **kwargs)
@@ -350,7 +416,7 @@ class SwagAPIManager(object):
                             )
         swaggerui_folder = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), 'static/swagger-ui')
-        print(swaggerui_folder)
+
         self.app.jinja_loader.searchpath.append(swaggerui_folder)
 
         @swagger.route('/swagger.json')
@@ -360,11 +426,28 @@ class SwagAPIManager(object):
             return jsonify(self.swagger)
 
         app.register_blueprint(swagger)
+    
+    def create_tests(self):
+        generate_headers_tests()
 
     def create_api(self, model, **kwargs):
         self.manager.create_api(model, **kwargs)
         self.add_defn(model, **kwargs)
         self.add_path(model, **kwargs)
+        tablename = model.__tablename__
+        if 'GET' in kwargs['methods']:
+            try:
+                generate_gets_test(tablename, model)
+            except AttributeError as e:
+                pass
+        if 'POST' in kwargs['methods']:
+            try:
+                generate_post_test(tablename, model)
+            except:
+                import traceback
+                print(traceback.format_exc())
+                pass
+
 
     def swagger_blueprint(self):
         return self.swagger
