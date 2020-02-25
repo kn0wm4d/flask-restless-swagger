@@ -95,6 +95,42 @@ def generate_post_test(tablename, model):
     file_test_routes.close()
     print('Generated test_post_%s()' % tablename)
 
+def generate_patch_test(tablename, model):
+    from sqlalchemy.sql.expression import func
+    import enum
+    from datetime import datetime
+    test_post_template = open('test_generator/patch_template','r').read()
+    primary_key = list(model.__table__.primary_key)[0].name
+    random_obj = model.query.order_by(func.random()).first().__dict__
+    del random_obj[primary_key]
+    del random_obj['_sa_instance_state']
+    columns_obj = get_columns(model)
+    for k,v in random_obj.items():
+        column_type = str(columns_obj[k].type)
+        if columns_obj[k].nullable is True and not v:
+            random_obj[k] = None
+        elif column_type == 'DATE':
+            random_obj[k] = v.strftime('%Y-%m-%d')
+        elif column_type == 'INTEGER' and not v:
+            random_obj[k] = None
+        elif column_type == 'INTEGER' and v:
+            random_obj[k] = int(v)
+        elif column_type == 'DATETIME':
+            random_obj[k] = v.strftime('%Y-%m-%d %H:%M:%S')
+        elif column_type == 'TEXT':
+            random_obj[k] = str(v)
+        elif column_type == 'BOOLEAN':
+            random_obj[k] = bool(v)
+        elif 'VARCHAR' in column_type:
+            random_obj[k] = v.value
+    example_object = {}
+    example_object['data'] = {'type': tablename, 'attributes': random_obj}
+    template = test_post_template.format(os.getenv('SECPORTAL_APIKEY'), tablename, example_object, primary_key)
+    file_test_routes = open('tests/test_routes.py','a')
+    file_test_routes.write(template)
+    file_test_routes.close()
+    print('Generated test_post_and_patch_%s()' % tablename)
+
 def generate_headers_tests():
     try:
         os.mkdir('tests')
@@ -439,6 +475,11 @@ class SwagAPIManager(object):
             try:
                 generate_gets_test(tablename, model)
             except AttributeError as e:
+                pass
+        if 'PATCH' in kwargs['methods']:
+            try:
+                generate_patch_test(tablename, model)
+            except:
                 pass
         if 'POST' in kwargs['methods']:
             try:
